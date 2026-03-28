@@ -1,0 +1,243 @@
+<style>
+  #tblView th { white-space: nowrap; background-color: #1e3a8a; color: white; border: 1px solid #ccc !important; }
+  #tblView td { border: 1px solid #ccc !important; }
+</style>
+
+<div style="margin-bottom: 10px; overflow: hidden; display: flex; justify-content: space-between; align-items: center;">
+  <span id="status_search_lich" style="font-family:'Times New Roman'; font-style:italic; font-weight:bold; font-size:15px; color:#1e3a8a;">
+      👋 Mời chọn khoảng thời gian để xem lịch...
+  </span>
+</div>
+
+<div style="background:#e0f2fe; padding:10px; border:1px solid #bae6fd; margin-bottom:10px; display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
+  <div style="display:flex; align-items:center; gap:5px; background:white; padding:3px; border-radius:4px; border:1px solid #ccc;">
+      <span style="font-family:'Times New Roman'; font-size:16px; font-weight:bold; padding-left:5px;">Từ:</span>
+      <input type="text" id="dFrom" placeholder="dd/mm/yyyy" maxlength="10" oninput="formatDate(this)" onkeydown="checkEnterLich(event)" style="font-family:'Times New Roman'; font-size:16px; border:none; outline:none; padding:4px; width:90px; text-align:center;">
+      <span style="font-family:'Times New Roman'; font-size:16px; font-weight:bold;">Đến:</span>
+      <input type="text" id="dTo" placeholder="dd/mm/yyyy" maxlength="10" oninput="formatDate(this)" onkeydown="checkEnterLich(event)" style="font-family:'Times New Roman'; font-size:16px; border:none; outline:none; padding:4px; width:90px; text-align:center;">
+  </div>
+  <input type="text" id="f_ContentLich" placeholder="🔍 Tìm nội dung, chủ trì, địa điểm..." style="flex:1; min-width:200px; padding:6px; font-family:'Times New Roman'; font-size:15px; border:1px solid #ccc; border-radius:4px;" onkeydown="checkEnterLich(event)">
+  <button onclick="loadDataServer()" style="background:#1e3a8a; color:white; border:none; padding:8px 20px; border-radius:4px; cursor:pointer; font-family:'Times New Roman'; font-size:15px; font-weight:bold; white-space:nowrap; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
+      🔍 Xem Lịch
+  </button>
+</div>
+
+<div class="table-scroll">
+  <table id="tblView" style="table-layout: fixed; width: 100%; min-width: 1000px;">
+    <colgroup> 
+        <col id="colSuaLich" style="width: 50px;"> 
+        <col style="width: 50px;"> 
+        <col style="width: 110px;"> 
+        <col style="width: 70px;"> 
+        <col> 
+        <col style="width: 200px;"> 
+        <col style="width: 200px;"> 
+        <col style="width: 150px;"> 
+        <col style="width: 110px;"> 
+    </colgroup>
+    <thead>
+      <tr>
+        <th id="thSuaLich">Sửa</th> 
+        <th>STT</th> <th>Thời gian<br>(dd/mm/yyyy)</th> <th>Giờ</th> <th>Nội dung công việc</th> <th>Chủ trì</th> <th>Địa điểm</th> <th>Thành phần</th> <th>File đính kèm</th>
+      </tr>
+    </thead>
+    <tbody id="bodyView">
+        <tr><td colspan="9" class="text-center" style="padding:20px; color:#666; border: 1px solid #ccc !important;">⏳ Vui lòng chọn thời gian và bấm Xem Lịch...</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<script>
+  let fullData = [];
+  let IS_AUTH_LICH = false; 
+
+  function initTabLich() {
+      setDefaultDates();
+      if (typeof google === 'undefined' || !google.script) return;
+      google.script.run.withSuccessHandler(res => {
+          IS_AUTH_LICH = res.canInput; 
+          const userName = res.operatorCode; // Đồng bộ định danh an toàn
+          const st = document.getElementById('status_search_lich');
+          if(st) st.innerHTML = "👤 " + userName;
+ 
+          const disp = IS_AUTH_LICH ? '' : 'none';
+          document.getElementById('colSuaLich').style.display = disp;
+          document.getElementById('thSuaLich').style.display = disp;
+      }).SCV_getInitialData();
+  }
+
+  function setDefaultDates() {
+      const now = new Date();
+      const ddTo = ("0" + now.getDate()).slice(-2);
+      const mmTo = ("0" + (now.getMonth() + 1)).slice(-2);
+      const yyyyTo = now.getFullYear();
+      
+      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      const ddEnd = ("0" + lastDay.getDate()).slice(-2);
+
+      if(!document.getElementById('dTo').value) document.getElementById('dTo').value = `${ddEnd}/${mmTo}/${yyyyTo}`;
+      if(!document.getElementById('dFrom').value) document.getElementById('dFrom').value = `01/${mmTo}/${yyyyTo}`;
+  }
+
+  function checkEnterLich(e) {
+      if (e.key === "Enter") loadDataServer();
+  }
+
+  function loadDataServer() {
+      const tbody = document.getElementById('bodyView');
+      const dFrom = document.getElementById('dFrom').value;
+      const dTo = document.getElementById('dTo').value;
+      const fContent = document.getElementById('f_ContentLich').value.trim();
+      const conditionString = dFrom + dTo + fContent;
+      
+      if (!conditionString) {
+          tbody.innerHTML = '<tr><td colspan="9" class="text-center" style="padding:20px; color:red; font-weight:bold; border: 1px solid #ccc !important;">⚠️ Vui lòng chọn khoảng thời gian!</td></tr>';
+          return;
+      }
+      
+      const colSpanNum = 9;
+
+      tbody.innerHTML = `
+          <tr>
+              <td colspan="${colSpanNum}" class="text-center" style="padding:30px; border: 1px solid #ccc !important;">
+                  <div style="display:inline-block; width:30px; height:30px; border:4px solid #ccc; border-top:4px solid #1e3a8a; border-radius:50%; animation:spin 1s linear infinite;"></div>
+                  <div style="margin-top:10px; color:#1e3a8a;">Đang tải dữ liệu lịch...</div>
+              </td>
+          </tr>`;
+          
+      google.script.run
+        .withSuccessHandler(data => {
+            let cleanData = data.filter(row => { return row && row[2] && String(row[2]).trim() !== ""; });
+            cleanData.sort((a, b) => { 
+                const timeA = parseDateTime(a[0], a[1]); 
+                const timeB = parseDateTime(b[0], b[1]); 
+                return timeB - timeA; 
+            });
+            
+            fullData = cleanData;
+            filterLichLocal(); 
+            const st = document.getElementById('status_search_lich');
+            if(st) st.innerHTML = `✅ Tìm thấy: ${cleanData.length} lịch công tác`;
+        })
+        .withFailureHandler(err => {
+            tbody.innerHTML = `<tr><td colspan="${colSpanNum}" class="text-center" style="padding:20px; color:red; font-weight:bold; border: 1px solid #ccc !important;">❌ Lỗi tải dữ liệu: ${err}</td></tr>`;
+        })
+        .SCV_getDataLich(conditionString);
+  }
+
+  function filterLichLocal() {
+      const fStr = document.getElementById('dFrom').value; 
+      const tStr = document.getElementById('dTo').value;
+      const fTxt = document.getElementById('f_ContentLich').value.toLowerCase().trim();
+
+      const strToDate = (s) => { if(!s) return null; const p = s.split('/');
+      if(p.length < 3) return null; const d = parseInt(p[0]), m = parseInt(p[1]), y = parseInt(p[2]);
+      if (isNaN(d) || isNaN(m) || isNaN(y)) return null; const dateObj = new Date(y, m-1, d); dateObj.setHours(0,0,0,0); return dateObj; };
+      
+      const dFrom = strToDate(fStr); 
+      const dTo = strToDate(tStr);
+
+      const res = fullData.filter(r => {
+          if(!r[0]) return false; 
+          const dRow = strToDate(r[0]); 
+          if(!dRow) return false;
+          if(dFrom && dRow.getTime() < dFrom.getTime()) return false;
+          if(dTo && dRow.getTime() > dTo.getTime()) return false;
+          if(fTxt) {
+              const content = (r[2] + " " + r[3] + " " + r[4] + " " + r[5]).toLowerCase();
+              if(!content.includes(fTxt)) return false;
+          }
+          return true;
+      });
+      renderTable(res);
+  }
+
+  function renderTable(data) {
+    const tb = document.getElementById('bodyView'); 
+    tb.innerHTML = "";
+    const colSpanNum = 9;
+    
+    if(!data || data.length === 0) { 
+        tb.innerHTML = `<tr><td colspan="${colSpanNum}" class="text-center" style="padding:20px; color:red; border: 1px solid #ccc !important;">❌ Không tìm thấy lịch nào phù hợp!</td></tr>`;
+        return; 
+    }
+    
+    data.forEach((r, i) => {
+       let cellVal = r[6], urlShow = "";
+       if (typeof cellVal === 'object' && cellVal !== null) { urlShow = cellVal.url || ""; } 
+       else { urlShow = String(cellVal || ""); }
+       
+       let linkHtml = "";
+       if (urlShow && urlShow.trim() !== "") { 
+           const links = urlShow.split(',').map(l => l.trim()).filter(l => l !== "");
+           linkHtml = `<div style="display:flex; flex-wrap:wrap; gap:3px; justify-content:center;">` + 
+                      links.map((url, idx) => `<a href="${url}" target="_blank" style="text-decoration:none; background:#e0f2fe; border:1px solid #bae6fd; padding:2px 5px; border-radius:3px; font-size:12px; font-weight:bold; color:#0369a1;" title="Xem tài liệu ${idx+1}">📎 ${idx+1}</a>`).join('') +
+                      `</div>`;
+       }
+       
+       const centerStyle = 'text-align: center; vertical-align: middle; padding: 8px; word-wrap: break-word; border: 1px solid #ccc !important;';
+       const leftStyle   = 'text-align: left !important; vertical-align: middle; padding: 8px; padding-left: 8px; word-wrap: break-word; white-space: pre-wrap; border: 1px solid #ccc !important;';
+       
+       const rowDataString = encodeURIComponent(JSON.stringify(r));
+       
+       let styleSua = IS_AUTH_LICH ? centerStyle : 'display: none;';
+       let btnSua = IS_AUTH_LICH ? `<button onclick="transferToEditLich(this, '${rowDataString}')" style="border:1px solid #94a3b8; background:#fff; cursor:pointer; padding:3px 8px; border-radius:4px; color:#1e3a8a; font-weight:bold;" title="Sửa nội dung này">📝</button>` : "";
+       let htmlSua = `<td style="${styleSua}">${btnSua}</td>`;
+
+       tb.innerHTML += `
+       <tr style="background-color:${i%2===0?'white':'#f9fafb'};">
+           ${htmlSua}
+           <td style="${centerStyle}">${i+1}</td>
+           <td style="${centerStyle}">${r[0] || ""}</td>
+           <td style="${centerStyle}">${r[1] || ""}</td>
+           <td style="${leftStyle}">${r[2] || ""}</td>
+           <td style="${centerStyle}">${r[3] || ""}</td>
+           <td style="${centerStyle}">${r[4] || ""}</td>
+           <td style="${centerStyle}">${r[5] || ""}</td>
+           <td style="${centerStyle}">${linkHtml}</td>
+       </tr>`;
+    });
+  }
+  
+  function transferToEditLich(btn, dataEncoded) {
+       try {
+           const rowData = JSON.parse(decodeURIComponent(dataEncoded));
+           if(typeof fillFormLich === 'function') {
+               fillFormLich(rowData);
+               const tr = btn.closest('tr');
+               tr.style.backgroundColor = '#fef9c3'; 
+               tr.style.transition = 'opacity 0.5s'; 
+               tr.style.opacity = '0';
+               setTimeout(() => tr.remove(), 500);
+               toast("✅ Đã chuyển dữ liệu sang tab [NHẬP LỊCH CÔNG TÁC].");
+           } else {
+               toast("❌ Lỗi: Không tìm thấy hàm điền dữ liệu.");
+           }
+       } catch(e) { console.error(e); toast("❌ Lỗi đọc dữ liệu!"); }
+  }
+
+  function formatDate(elm) { 
+      let v = elm.value.replace(/\D/g,'');
+      if (v.length > 8) v = v.substring(0,8); 
+      let o = ""; 
+      if (v.length > 0) o += v.substring(0,2);
+      if (v.length > 2) o += '/' + v.substring(2,4); 
+      if (v.length > 4) o += '/' + v.substring(4,8);
+      elm.value = o; 
+  }
+  
+  function parseDateTime(dStr, tStr) { 
+      if(!dStr) return 0;
+      try { 
+          const d = dStr.split('/');
+          let h = 0, m = 0; 
+          if(tStr && String(tStr).includes(':')) { 
+              const t = String(tStr).split(':');
+              h = parseInt(t[0]) || 0; m = parseInt(t[1]) || 0;
+          } else if (tStr && !isNaN(tStr)) { h = parseInt(tStr) || 0; } 
+          return new Date(d[2], d[1]-1, d[0], h, m).getTime();
+      } catch(e) { return 0; } 
+  }
+  
+  initTabLich();
+</script>

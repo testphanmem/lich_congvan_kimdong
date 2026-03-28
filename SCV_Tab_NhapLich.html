@@ -1,0 +1,181 @@
+<style>
+  .btn-icon { border: 1px solid #ccc; background: #f1f5f9; cursor: pointer; padding: 4px 8px; border-radius: 4px; font-size: 14px; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; height: 28px; }
+  .btn-upload-icon:hover { background: #e2e8f0; border-color: #94a3b8; }
+  .btn-view-icon { background: #dbeafe; color: #1e40af; border-color: #bfdbfe; padding: 4px 6px; }
+  .btn-view-icon:hover { background: #bfdbfe; }
+</style>
+
+<div style="margin-bottom: 10px; overflow: hidden; display: flex; justify-content: space-between; align-items: center;">
+  <div style="font-family:'Times New Roman'; font-weight:bold; color:#1e3a8a; font-size:16px;">
+    📝 NHẬP LỊCH CÔNG TÁC
+  </div>
+</div>
+
+<div class="table-scroll">
+  <table id="tblLich">
+    <thead>
+      <tr>
+        <th style="width:40px">Xóa</th>
+        <th style="width:110px">Thời gian<br>(dd/mm/yyyy)</th> <th style="width:70px">Giờ</th> <th>Nội dung công việc <span style="color:red">*</span></th> <th style="width:130px">Chủ trì</th> <th style="width:200px">Địa điểm</th> <th style="width:150px">Thành phần</th> <th style="width:130px">File</th> </tr>
+    </thead>
+    <tbody id="bodyLich">
+       <tr class="input-row">
+         <td><button onclick="delRowLich(this)" style="color:red;border:none;background:none;cursor:pointer; font-size: 16px;">🗑️</button></td>
+         <td style="text-align: center; vertical-align: middle;"><textarea class="cell-input text-center" rows="1" oninput="formatDate(this)" placeholder="dd/mm/yyyy"></textarea></td>
+         <td style="text-align: center; vertical-align: middle;"><textarea class="cell-input text-center" rows="1" placeholder="HH:mm"></textarea></td>
+         <td style="text-align: left !important; vertical-align: middle !important; padding: 1px;"><textarea class="cell-input" style="text-align: left; padding-left: 8px;" rows="1" oninput="autoResize(this)" placeholder="Nhập nội dung..."></textarea></td>
+         <td style="text-align: center; vertical-align: middle;"><textarea class="cell-input text-center" rows="1" oninput="autoResize(this)"></textarea></td>
+         <td style="text-align: center; vertical-align: middle;"><textarea class="cell-input text-center" rows="1" oninput="autoResize(this)"></textarea></td>
+         <td style="text-align: center; vertical-align: middle;"><textarea class="cell-input text-center" rows="1" oninput="autoResize(this)"></textarea></td>
+         
+         <td style="vertical-align: middle; padding: 2px;">
+            <div style="display: flex; flex-direction:column; align-items: center; justify-content: center; gap: 3px; width: 100%;">
+                <div class="link-display-area" style="display:flex; flex-wrap:wrap; gap:3px; justify-content:center;"></div>
+                <button type="button" onclick="openUploadLich(this)" class="btn-icon btn-upload-icon" title="Đính kèm file" style="opacity:1; pointer-events:auto; margin-top:2px;">📎 Đính kèm</button>
+                <input type="hidden" class="val-link url-holder">
+                <input type="hidden" class="val-id">
+            </div>
+         </td>
+       </tr>
+    </tbody>
+  </table>
+</div>
+
+<div style="margin-top:15px; display: flex; justify-content: space-between; align-items: center;">
+    <button id="btnAddRow" onclick="addRowLich()" style="background:#64748b; color:white; padding:8px 15px; border:none; border-radius:4px; cursor:pointer;">+ Thêm dòng</button>
+    <button class="btn-save" style="background:#1e3a8a; color:white; padding:8px 25px; border:none; border-radius:4px; cursor:pointer; font-weight:bold;" onclick="handleSaveLich()">💾 LƯU LỊCH CÔNG TÁC</button>
+</div>
+
+<script>
+  function addRowLich() {
+    const tbody = document.getElementById('bodyLich');
+    const newRow = tbody.rows[0].cloneNode(true);
+    newRow.querySelectorAll('textarea').forEach(t => { t.value = ""; t.style.height = 'auto'; });
+    const container = newRow.cells[7].querySelector('div');
+    container.querySelector('.btn-upload-icon').innerHTML = '📎 Đính kèm';
+    container.querySelector('.btn-upload-icon').style.borderColor = "#ccc";
+    container.querySelector('.link-display-area').innerHTML = '';
+    container.querySelector('.val-link').value = "";
+    container.querySelector('.val-id').value = ""; 
+    tbody.appendChild(newRow);
+  }
+
+  function delRowLich(btn) { if(document.querySelectorAll('#bodyLich tr').length > 1) btn.closest('tr').remove(); else toast('Không thể xóa dòng cuối cùng!'); }
+ 
+  function autoResize(elm) { elm.style.height = 'auto'; elm.style.height = elm.scrollHeight + 'px'; }
+  function formatDate(elm) { let v = elm.value.replace(/\D/g,''); if (v.length > 8) v = v.substring(0,8); let o = "";
+    if (v.length > 0) o += v.substring(0,2); if (v.length > 2) o += '/' + v.substring(2,4);
+    if (v.length > 4) o += '/' + v.substring(4,8); elm.value = o; }
+
+  const ID_FOLDER_LICH = '1InlshCcub6OD3nS8sCUMO5koluNvlI9q';
+  function openUploadLich(btn) {
+       const tr = btn.closest('tr');
+       const inputs = tr.querySelectorAll('textarea');
+       if (inputs[2].value.trim() === "") { 
+           toast("⚠️ Nhập nội dung công việc trước khi đính kèm!");
+           inputs[2].focus(); return; 
+       }
+       const container = btn.parentElement;
+       const linkCu = container.querySelector('.val-link').value || "";
+       if(typeof SCV_OpenUploadModal === 'function') { 
+           SCV_OpenUploadModal(btn, linkCu, ID_FOLDER_LICH);
+       } else { alert("Lỗi: Module upload chưa tải!"); }
+  }
+
+  function handleSaveLich() {
+    const rows = document.querySelectorAll('.input-row');
+    const data = [];
+    rows.forEach(tr => {
+      const inputs = tr.querySelectorAll('textarea');
+      const chutri = tr.cells[4].querySelector('textarea').value;    
+      const diadiem = tr.cells[5].querySelector('textarea').value;   
+      const thanhphan = tr.cells[6].querySelector('textarea').value; 
+      const url = tr.querySelector('.val-link').value;
+      const id = tr.querySelector('.val-id').value; 
+      
+      if (inputs[2].value.trim() !== "") {
+        data.push([ inputs[0].value, inputs[1].value, inputs[2].value, chutri, diadiem, thanhphan, url, id ]);
+      }
+    });
+    
+    if (data.length === 0) return toast("⚠️ Nhập ít nhất một nội dung!");
+    
+    const btn = document.querySelector('.btn-save');
+    btn.disabled = true;
+    btn.innerText = "⏳ ĐANG LƯU...";
+    
+    google.script.run.withSuccessHandler(res => {
+      btn.disabled = false; btn.innerText = "💾 LƯU LỊCH CÔNG TÁC";
+      
+      if(res.includes("Đã lưu") || res.includes("✅") || res.includes("Thành công") || res.includes("cập nhật")) {
+         toast(res);
+         const tbody = document.getElementById('bodyLich');
+         while(tbody.rows.length > 1) tbody.deleteRow(1);
+         const r = tbody.rows[0];
+         r.querySelectorAll('textarea').forEach(t => { t.value = ""; t.style.height = 'auto'; });
+         r.querySelector('.btn-upload-icon').innerHTML = '📎 Đính kèm';
+         r.querySelector('.btn-upload-icon').style.borderColor = "#ccc";
+         r.querySelector('.link-display-area').innerHTML = '';
+         r.querySelector('.val-link').value = "";
+         r.querySelector('.val-id').value = "";
+      } else {
+         toast(res);
+      }
+    }).withFailureHandler(err => {
+         btn.disabled = false; 
+         btn.innerText = "💾 LƯU LỊCH CÔNG TÁC";
+         toast("❌ Lỗi hệ thống: " + err);
+    }).SCV_saveDataLich(data);
+  }
+
+function fillFormLich(rowData) {
+    const tbody = document.getElementById('bodyLich');
+    while(tbody.rows.length > 1) tbody.deleteRow(1);
+    const r = tbody.rows[0];
+    const inputs = r.querySelectorAll('textarea');
+    
+    inputs[0].value = rowData[0] || ""; 
+    inputs[1].value = rowData[1] || ""; 
+    inputs[2].value = rowData[2] || "";
+    inputs[3].value = rowData[3] || ""; 
+    inputs[4].value = rowData[4] || ""; 
+    inputs[5].value = rowData[5] || ""; 
+    
+    let rawLink = rowData[6];
+    let finalUrl = "";
+    if (rawLink && typeof rawLink === 'object') { finalUrl = rawLink.url || ""; } 
+    else { finalUrl = rawLink || ""; }
+
+    const id = rowData[7] || ""; 
+    const container = r.cells[7].querySelector('div');
+    container.querySelector('.val-link').value = finalUrl;
+    let inputId = container.querySelector('.val-id');
+    if(!inputId) {
+        inputId = document.createElement('input');
+        inputId.type = 'hidden';
+        inputId.className = 'val-id';
+        container.appendChild(inputId);
+    }
+    inputId.value = id;
+
+    const displayArea = container.querySelector('.link-display-area');
+    const btnUpload = container.querySelector('.btn-upload-icon');
+    if(finalUrl && finalUrl.trim() !== "") {
+        const links = finalUrl.split(',').map(l => l.trim()).filter(l => l !== "");
+        displayArea.innerHTML = links.map((l, idx) => 
+            `<a href="${l}" target="_blank" class="btn-icon btn-view-icon" title="Xem tài liệu ${idx + 1}">📎 ${idx + 1}</a>`
+        ).join('');
+        btnUpload.innerHTML = '📝 Sửa/Thêm'; 
+        btnUpload.title = "Cập nhật hoặc thêm file";
+        btnUpload.style.borderColor = "#f59e0b";
+    } else {
+        displayArea.innerHTML = '';
+        btnUpload.innerHTML = '📎 Đính kèm';
+        btnUpload.title = "Đính kèm file";
+        btnUpload.style.borderColor = "#ccc";
+    }
+    
+    inputs.forEach(t => autoResize(t));
+    document.getElementById('tblLich').scrollIntoView({behavior: "smooth", block: "center"});
+}
+</script>

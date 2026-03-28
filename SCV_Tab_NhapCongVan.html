@@ -1,0 +1,239 @@
+<style>
+  .btn-icon { border: 1px solid #ccc; background: #f1f5f9; cursor: pointer; padding: 4px 8px; border-radius: 4px; font-size: 14px; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; height: 28px; }
+  .btn-upload-icon:hover { background: #e2e8f0; border-color: #94a3b8; }
+  .btn-view-icon { background: #dbeafe; color: #1e40af; border-color: #bfdbfe; padding: 4px 6px; }
+  .btn-view-icon:hover { background: #bfdbfe; }
+  #tblCongVan th, #tblCongVan td { border: 1px solid #ccc !important; }
+</style>
+
+<div style="margin-bottom: 10px; overflow: hidden; display: flex; justify-content: space-between; align-items: center;">
+  <div style="font-family:'Times New Roman'; font-weight:bold; color:#b91c1c; font-size:16px;">
+    📂 NHẬP CÔNG VĂN ĐI / ĐẾN
+  </div>
+</div>
+
+<div class="cv-controls" style="flex-direction: row; flex-wrap: wrap; gap: 20px; align-items: center; justify-content: flex-start;">
+    <div style="display: flex; align-items: center; gap: 5px;">
+        <label class="cv-label" style="width: auto; margin-right: 5px;">Loại cơ quan: <span style="color:red">*</span></label>
+        <select id="cbLoaiCQ" class="cv-combo" style="width: 150px;"><option value="">-- Chọn --</option></select>
+    </div>
+    <div style="display: flex; align-items: center; gap: 5px;">
+        <label class="cv-label" style="width: auto; margin-right: 5px;">CQ ban hành: <span style="color:red">*</span></label>
+        <select id="cbCoQuan" class="cv-combo" style="width: 150px;"><option value="">-- Chọn --</option></select>
+    </div>
+    <div style="display: flex; align-items: center; gap: 5px;">
+        <label class="cv-label" style="width: auto; margin-right: 5px;">Loại văn bản: <span style="color:red">*</span></label>
+        <select id="cbLoaiVB" class="cv-combo" style="width: 150px;"><option value="">-- Chọn --</option></select>
+    </div>
+</div>
+
+<div class="table-scroll">
+    <table id="tblCongVan">
+        <thead>
+            <tr>
+                <th style="width: 40px;">Xóa</th>
+                <th style="width: 100px;">Ngày ban hành<br>(dd/mm/yyyy)</th>
+                <th style="width: 100px;">Ký hiệu</th>
+                <th>Nội dung trích yếu văn bản <span style="color:red">*</span></th>
+                <th style="width: 120px;">Nơi nhận/Ban hành</th>
+                <th style="width: 130px;">File đính kèm</th>
+                <th style="width: 100px;">Ghi chú</th>
+            </tr>
+        </thead>
+        <tbody id="bodyCongVan">
+            <tr>
+                <td><button onclick="delRowCV(this)" style="color:red;border:none;background:none;cursor:pointer; font-size: 16px;">🗑️</button></td>
+                <td style="text-align: center; vertical-align: middle;"><input type="text" class="cell-input" placeholder="dd/mm/yyyy" oninput="formatDate(this)" maxlength="10" style="text-align:center;"></td>
+                <td style="text-align: center; vertical-align: middle;"><input type="text" class="cell-input" style="text-align:center;"></td>
+                <td style="text-align: left !important; vertical-align: middle !important; padding: 1px;"><textarea class="cell-input" rows="1" oninput="autoResize(this)" style="text-align: left; vertical-align: middle; min-height: 40px; overflow:hidden; resize: none; line-height: 1.5;"></textarea></td>
+                <td style="text-align: center; vertical-align: middle;"><input type="text" class="cell-input" style="text-align:center;"></td>
+                <td style="vertical-align: middle; padding: 2px;">
+                    <div style="display: flex; flex-direction:column; align-items: center; justify-content: center; gap: 3px; width: 100%;">
+                        <div class="link-display-area" style="display:flex; flex-wrap:wrap; gap:3px; justify-content:center;"></div>
+                        <button type="button" onclick="openUploadCV(this)" class="btn-icon btn-upload-icon" title="Đính kèm file" style="opacity:1; pointer-events:auto; margin-top:2px;">📎 Đính kèm</button>
+                        <input type="hidden" class="val-link">
+                        <input type="hidden" class="val-id">
+                    </div>
+                </td>
+                <td style="text-align: center; vertical-align: middle;"><input type="text" class="cell-input" style="text-align:center;"></td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<div style="margin-top:15px; display: flex; justify-content: space-between; align-items: center;">
+    <button id="btnAddRowCV" onclick="addRowCV()" style="background:#64748b; color:white; padding:8px 15px; border:none; border-radius:4px; cursor:pointer;">+ Thêm dòng</button>
+    <button id="btnSaveCV" onclick="doSaveCongVan()" style="background:#1e3a8a; color:white; padding:8px 25px; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">LƯU CÔNG VĂN</button>
+</div>
+
+<script>
+    function initCongVan() {
+        if (typeof google === 'undefined' || !google.script) {
+            toast("❌ Lỗi: Chưa tải được file kết nối ketnoi.js"); return;
+        }
+        google.script.run
+            .withSuccessHandler(data => {
+                fillCombo('cbLoaiCQ', data.loaiCQ); fillCombo('cbCoQuan', data.coQuan); fillCombo('cbLoaiVB', data.loaiVB);
+            })
+            .withFailureHandler(err => toast("❌ Lỗi tải danh mục Công văn: " + err))
+            .SCV_getDmCongVan();
+    }
+    
+    function fillCombo(id, list) {
+        const sel = document.getElementById(id);
+        const currentVal = sel.value; 
+        sel.innerHTML = '<option value="">-- Chọn --</option>';
+        if (list && list.length > 0) list.forEach(item => sel.add(new Option(item, item)));
+        if(currentVal) sel.value = currentVal;
+    }
+    
+    function addRowCV() {
+        const row = document.querySelector('#bodyCongVan tr').cloneNode(true);
+        row.querySelectorAll('input, textarea').forEach(e => { e.value = ''; if(e.tagName === 'TEXTAREA') e.style.height = 'auto'; });
+        const container = row.cells[5].querySelector('div');
+        container.querySelector('.btn-upload-icon').innerHTML = '📎 Đính kèm';
+        container.querySelector('.btn-upload-icon').style.borderColor = "#ccc";
+        container.querySelector('.link-display-area').innerHTML = '';
+        container.querySelector('.val-link').value = "";
+        container.querySelector('.val-id').value = ""; 
+        document.getElementById('bodyCongVan').appendChild(row);
+    }
+    
+    function delRowCV(btn) { if(document.querySelectorAll('#bodyCongVan tr').length > 1) btn.closest('tr').remove(); else toast('Không thể xóa dòng cuối cùng!'); }
+
+    const ID_FOLDER_CONGVAN = '1eu9CK83yeBhSu2aweqjKdQX7KkD1HL2h';
+    function openUploadCV(btn) {
+       const row = btn.closest('tr');
+       const txtContent = row.cells[3].querySelector('textarea');
+       if (txtContent.value.trim() === "") { 
+           toast("⚠️ Vui lòng nhập nội dung trích yếu trước khi đính kèm file!");
+           txtContent.focus(); highlightError(txtContent); return; 
+       }
+       const container = btn.parentElement;
+       const linkCu = container.querySelector('.val-link').value || "";
+       if(typeof SCV_OpenUploadModal === 'function') {
+           SCV_OpenUploadModal(btn, linkCu, ID_FOLDER_CONGVAN);
+       } else { alert("Lỗi: Module upload chưa được tải!"); }
+    }
+
+    function doSaveCongVan() {
+        const btn = document.getElementById('btnSaveCV'); 
+        const oldText = btn.innerText;
+
+        try {
+            const elLoaiCQ = document.getElementById('cbLoaiCQ');
+            const elCoQuan = document.getElementById('cbCoQuan'); 
+            const elLoaiVB = document.getElementById('cbLoaiVB');
+
+            if (elLoaiCQ.value === "") { toast("⚠️ Vui lòng chọn Loại cơ quan!"); elLoaiCQ.focus(); highlightError(elLoaiCQ); return; }
+            if (elCoQuan.value === "") { toast("⚠️ Vui lòng chọn Cơ quan ban hành!"); elCoQuan.focus(); highlightError(elCoQuan); return; }
+            if (elLoaiVB.value === "") { toast("⚠️ Vui lòng chọn Loại văn bản!"); elLoaiVB.focus(); highlightError(elLoaiVB); return; }
+
+            const common = { loaiCQ: elLoaiCQ.value, coQuan: elCoQuan.value, loaiVB: elLoaiVB.value };
+            const rows = document.querySelectorAll('#bodyCongVan tr'); 
+            const data = [];
+
+            for (let i = 0; i < rows.length; i++) {
+                const r = rows[i];
+                const ngay = r.cells[1].querySelector('input').value; 
+                const kyhieu = r.cells[2].querySelector('input').value; 
+                const trichyeu = r.cells[3].querySelector('textarea').value;
+                const noinhan = r.cells[4].querySelector('input').value; 
+                const link = r.cells[5].querySelector('.val-link').value;
+                const id = r.cells[5].querySelector('.val-id').value; 
+                const ghichu = r.cells[6].querySelector('input').value;
+
+                if (trichyeu.trim() === "") { 
+                    toast("⚠️ Dòng số " + (i + 1) + " chưa nhập Nội dung trích yếu!");
+                    const txtArea = r.cells[3].querySelector('textarea');
+                    txtArea.focus(); highlightError(txtArea); return; 
+                }
+                data.push([ngay, kyhieu, trichyeu, noinhan, link, ghichu, id]);
+            }
+
+            if (data.length === 0) { toast("⚠️ Không có dữ liệu để lưu!"); return; }
+            
+            btn.innerText = "⏳ Đang lưu..."; 
+            btn.disabled = true;
+
+            google.script.run
+                .withSuccessHandler(res => {
+                    btn.innerText = oldText; btn.disabled = false;
+                    if(res.includes("thành công") || res.includes("Đã lưu") || res.includes("✅")) {
+                          toast(res);
+                          const tbody = document.getElementById('bodyCongVan');
+                          while(tbody.rows.length > 1) tbody.deleteRow(1);
+                          const r = tbody.rows[0];
+                          r.querySelectorAll('input, textarea').forEach(e => { e.value=''; if(e.tagName === 'TEXTAREA') e.style.height = 'auto'; });
+                          const container = r.cells[5].querySelector('div');
+                          container.querySelector('.link-display-area').innerHTML = '';
+                          container.querySelector('.btn-upload-icon').innerHTML = '📎 Đính kèm';
+                          container.querySelector('.btn-upload-icon').style.borderColor = "#ccc";
+                          container.querySelector('.val-link').value = "";
+                          container.querySelector('.val-id').value = "";
+                    } else { toast(res); }
+                })
+                .withFailureHandler(err => { 
+                    btn.innerText = oldText; btn.disabled = false; 
+                    toast("❌ Lỗi hệ thống: " + err); 
+                })
+                .SCV_saveCongVan(common, data);
+        } catch(error) {
+            btn.innerText = oldText; btn.disabled = false;
+            toast("❌ Lỗi trình duyệt: " + error.message);
+        }
+    }
+    
+    function highlightError(elm) { elm.style.backgroundColor = "#ffe4e6"; elm.style.border = "1px solid red";
+      setTimeout(() => { elm.style.backgroundColor = "white"; elm.style.border = "1px solid #ccc"; }, 2000);
+    }
+    function formatDate(elm) { let v = elm.value.replace(/\D/g,''); if (v.length > 8) v = v.substring(0,8);
+      let o = ""; if (v.length > 0) o += v.substring(0,2); if (v.length > 2) o += '/' + v.substring(2,4);
+      if (v.length > 4) o += '/' + v.substring(4,8); elm.value = o;
+    }
+    function autoResize(elm) { elm.style.height = 'auto'; elm.style.height = (elm.scrollHeight) + 'px'; }
+
+    function fillFormCongVan(dataObj) {
+         document.getElementById('cbLoaiCQ').value = dataObj.loaiCQ || "";
+         document.getElementById('cbCoQuan').value = dataObj.coQuan || "";
+         document.getElementById('cbLoaiVB').value = dataObj.loaiVB || "";
+         
+         const tbody = document.getElementById('bodyCongVan');
+         while(tbody.rows.length > 1) tbody.deleteRow(1);
+         const r = tbody.rows[0];
+         
+         r.cells[1].querySelector('input').value = dataObj.ngayBH || "";
+         r.cells[2].querySelector('input').value = dataObj.kyHieu || "";
+         r.cells[3].querySelector('textarea').value = dataObj.trichYeu || "";
+         r.cells[4].querySelector('input').value = dataObj.noiNhan || "";
+         r.cells[6].querySelector('input').value = dataObj.ghiChu || "";
+         
+         const container = r.cells[5].querySelector('div');
+         const finalUrl = dataObj.vanBanUrl || "";
+         container.querySelector('.val-link').value = finalUrl;
+         
+         let inputId = container.querySelector('.val-id');
+         if(!inputId) {
+             inputId = document.createElement('input');
+             inputId.type = 'hidden';
+             inputId.className = 'val-id';
+             container.appendChild(inputId);
+         }
+         inputId.value = dataObj.id || "";
+         
+         const displayArea = container.querySelector('.link-display-area');
+         const btnUpload = container.querySelector('.btn-upload-icon');
+         
+         if(finalUrl && finalUrl.trim() !== "") {
+            const links = finalUrl.split(',').map(l => l.trim()).filter(l => l !== "");
+            displayArea.innerHTML = links.map((l, idx) => `<a href="${l}" target="_blank" class="btn-icon btn-view-icon" title="Xem tài liệu ${idx + 1}">📎 ${idx + 1}</a>`).join('');
+            btnUpload.innerHTML = '📝 Sửa/Thêm'; btnUpload.title = 'Cập nhật thêm tài liệu'; btnUpload.style.borderColor = "#f59e0b";
+         } else {
+            displayArea.innerHTML = ''; btnUpload.innerHTML = '📎 Đính kèm'; btnUpload.title = 'Đính kèm file'; btnUpload.style.borderColor = "#ccc";
+         }
+         
+         autoResize(r.cells[3].querySelector('textarea'));
+         document.getElementById('tblCongVan').scrollIntoView({behavior: "smooth", block: "center"});
+         toast("📝 Đã tải công văn để sửa!");
+    }
+</script>

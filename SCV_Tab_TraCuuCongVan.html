@@ -1,0 +1,249 @@
+<style>
+  #tblSearchCV th, #tblSearchCV td { border: 1px solid #ccc !important; }
+  #tblSearchCV th { white-space: nowrap; background-color: #1e3a8a; color: white; }
+  .highlight-text { background-color: yellow; font-weight: bold; }
+</style>
+
+<div style="margin-bottom: 10px; overflow: hidden; display: flex; justify-content: space-between; align-items: center;">
+  <span id="status_search_cv" style="font-family:'Times New Roman'; font-style:italic; font-weight:bold; font-size:15px; color:#1e3a8a;">
+      👋 Mời chọn điều kiện để tìm kiếm...
+  </span>
+</div>
+
+<div class="cv-controls" style="flex-direction: row; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: flex-start; padding: 10px; background:#e0f2fe; border:1px solid #bae6fd;">
+    <select id="f_LoaiCQ" class="cv-combo" style="width: 130px;" onchange="loadDataSearchCV()"><option value="">-- Loại CQ --</option></select>
+    <select id="f_CoQuan" class="cv-combo" style="width: 130px;" onchange="loadDataSearchCV()"><option value="">-- CQ Ban Hành --</option></select>
+    <select id="f_LoaiVB" class="cv-combo" style="width: 130px;" onchange="loadDataSearchCV()"><option value="">-- Loại VB --</option></select>
+    
+    <input type="text" id="f_KyHieu" placeholder="Tìm Ký hiệu..." class="cv-combo" style="width:110px;" onkeydown="checkEnter(event)">
+
+    <div style="display:flex; align-items:center; gap:5px; background:white; padding:3px; border-radius:4px; border:1px solid #ccc;">
+       <span style="font-size:12px; font-weight:bold; color:#555;">Ngày:</span>
+       <input type="text" id="f_TuNgay" placeholder="dd/mm/yyyy" style="width:80px; border:none; outline:none; text-align:center; font-size:13px;" oninput="formatDate(this)" onkeydown="checkEnter(event)">
+       <span>-</span>
+       <input type="text" id="f_DenNgay" placeholder="dd/mm/yyyy" style="width:80px; border:none; outline:none; text-align:center; font-size:13px;" oninput="formatDate(this)" onkeydown="checkEnter(event)">
+    </div>
+
+    <input type="text" id="f_TrichYeu" placeholder="🔍 Nhập nội dung trích yếu..." class="cv-combo" style="flex:1; min-width:250px; font-weight:bold;" onkeydown="checkEnter(event)">
+
+    <button onclick="loadDataSearchCV()" style="background:#1e3a8a; color:white; border:none; padding:8px 20px; border-radius:4px; cursor:pointer; font-weight:bold; white-space:nowrap; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
+        🔍 Tìm kiếm
+    </button>
+</div>
+
+<div class="table-scroll">
+    <table id="tblSearchCV" style="width: 100%; min-width: 1000px;">
+        <colgroup> 
+            <col id="colSuaCV" style="width: 50px;">
+            <col style="width: 50px;">  
+            <col style="width: 100px;"> 
+            <col style="width: 100px;"> 
+            <col>                       
+            <col style="width: 150px;"> 
+            <col style="width: 100px;">  
+            <col style="width: 150px;"> 
+        </colgroup>
+        <thead>
+            <tr> 
+                <th id="thSuaCV">Sửa</th>
+                <th>STT</th> 
+                <th>Ngày ban hành</th> 
+                <th>Ký hiệu</th> 
+                <th>Nội dung trích yếu văn bản</th> 
+                <th>Nơi nhận/Ban hành</th> 
+                <th>File đính kèm</th> 
+                <th>Ghi chú</th> 
+            </tr>
+        </thead>
+        <tbody id="bodySearchCV">
+            <tr><td colspan="8" class="text-center" style="padding:20px; color:#666;">⏳ Vui lòng nhập điều kiện và bấm Tìm kiếm...</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<script>
+    let FULL_DATA_CV = [];
+    let IS_AUTH_CV = false; 
+
+    function initSearchCV() {
+        if (typeof google === 'undefined' || !google.script) return;
+
+        google.script.run
+            .withSuccessHandler(data => {
+                fillComboFilter('f_LoaiCQ', data.loaiCQ, '-- Loại CQ --');
+                fillComboFilter('f_CoQuan', data.coQuan, '-- CQ Ban Hành --');
+                fillComboFilter('f_LoaiVB', data.loaiVB, '-- Loại VB --');
+            })
+            .withFailureHandler(err => toast("❌ Không tải được danh mục lọc: " + err))
+            .SCV_getDmCongVan();
+        
+        google.script.run
+            .withSuccessHandler(res => {
+                IS_AUTH_CV = res.canInput;
+                const st = document.getElementById('status_search_cv');
+                if(st) st.innerHTML = "👤 " + res.operatorCode; // Đồng bộ định danh an toàn
+
+                const disp = IS_AUTH_CV ? '' : 'none';
+                document.getElementById('colSuaCV').style.display = disp;
+                document.getElementById('thSuaCV').style.display = disp;
+            })
+            .withFailureHandler(err => console.error("Lỗi auth: ", err))
+            .SCV_getInitialData();
+    }
+
+    function fillComboFilter(id, list, defaultText) {
+        const sel = document.getElementById(id);
+        sel.innerHTML = `<option value="">${defaultText}</option>`;
+        if (list && list.length > 0) { list.forEach(item => { let opt = document.createElement('option'); opt.value = item; opt.innerText = item; sel.appendChild(opt); }); }
+    }
+
+    function checkEnter(e) { if (e.key === "Enter") { loadDataSearchCV(); } }
+
+    function loadDataSearchCV() {
+        const tbody = document.getElementById('bodySearchCV');
+        const vLoaiCQ = document.getElementById('f_LoaiCQ').value;
+        const vCoQuan = document.getElementById('f_CoQuan').value;
+        const vLoaiVB = document.getElementById('f_LoaiVB').value;
+        const vKyHieu = document.getElementById('f_KyHieu').value.trim();
+        const vTuNgay = document.getElementById('f_TuNgay').value;
+        const vDenNgay = document.getElementById('f_DenNgay').value;
+        const vTrichYeu = document.getElementById('f_TrichYeu').value.trim();
+
+        const conditionString = vLoaiCQ + vCoQuan + vLoaiVB + vKyHieu + vTuNgay + vDenNgay + vTrichYeu;
+        if (!conditionString) {
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center" style="padding:20px; color:red; font-weight:bold; border: 1px solid #ccc !important;">⚠️ Vui lòng nhập ít nhất 1 điều kiện để tìm!</td></tr>';
+            return;
+        }
+
+        const colSpanNum = IS_AUTH_CV ? 8 : 7;
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="${colSpanNum}" class="text-center" style="padding:30px; border: 1px solid #ccc !important;">
+                    <div class="spinner" style="width:30px; height:30px; border:4px solid #ccc; border-top:4px solid #1e3a8a; border-radius:50%; animation:spin 1s linear infinite; margin:0 auto;"></div>
+                    <div style="margin-top:10px; color:#1e3a8a;">Đang tìm kiếm dữ liệu...</div>
+                </td>
+            </tr>`;
+            
+        google.script.run
+            .withSuccessHandler(data => {
+                data.sort((a, b) => parseDateCV(b.ngayBH) - parseDateCV(a.ngayBH));
+                FULL_DATA_CV = data;
+                filterCongVanLocal(); 
+                const st = document.getElementById('status_search_cv');
+                st.innerHTML = `✅ Tìm thấy: ${data.length} văn bản`;
+            })
+            .withFailureHandler(err => {
+                tbody.innerHTML = `<tr><td colspan="${colSpanNum}" class="text-center" style="padding:20px; color:red; font-weight:bold; border: 1px solid #ccc !important;">❌ Lỗi kết nối máy chủ: ${err}</td></tr>`;
+            })
+            .SCV_getDataCongVan(conditionString);
+    }
+
+    function filterCongVanLocal() {
+        if (!FULL_DATA_CV || FULL_DATA_CV.length === 0) { renderTableCV([]); return; }
+
+        const fLoaiCQ = document.getElementById('f_LoaiCQ').value.toLowerCase();
+        const fCoQuan = document.getElementById('f_CoQuan').value.toLowerCase();
+        const fLoaiVB = document.getElementById('f_LoaiVB').value.toLowerCase();
+        const fKyHieu = document.getElementById('f_KyHieu').value.toLowerCase().trim();
+        const fTu = parseDateCV(document.getElementById('f_TuNgay').value);
+        const fDen = parseDateCV(document.getElementById('f_DenNgay').value);
+        const fText = document.getElementById('f_TrichYeu').value.toLowerCase().trim();
+        
+        const result = FULL_DATA_CV.filter(item => {
+            if(fLoaiCQ && String(item.loaiCQ).toLowerCase() !== fLoaiCQ) return false;
+            if(fCoQuan && String(item.coQuan).toLowerCase() !== fCoQuan) return false;
+            if(fLoaiVB && String(item.loaiVB).toLowerCase() !== fLoaiVB) return false;
+            if(fKyHieu && !String(item.kyHieu).toLowerCase().includes(fKyHieu)) return false;
+
+            const dItem = parseDateCV(item.ngayBH);
+            if(fTu && dItem < fTu) return false;
+            if(fDen && dItem > fDen) return false;
+
+            if(fText) {
+                const content = (String(item.trichYeu) + " " + String(item.kyHieu) + " " + String(item.ghiChu)).toLowerCase();
+                if (!content.includes(fText)) return false;
+            }
+            return true;
+        });
+        renderTableCV(result);
+    }
+
+    function renderTableCV(data) {
+        const tb = document.getElementById('bodySearchCV');
+        tb.innerHTML = "";
+        const colSpanNum = IS_AUTH_CV ? 8 : 7;
+        
+        if(!data || data.length === 0) { 
+            tb.innerHTML = `<tr><td colspan="${colSpanNum}" class="text-center" style="padding:20px; color:red; border: 1px solid #ccc !important;">❌ Không tìm thấy văn bản phù hợp!</td></tr>`;
+            return; 
+        }
+
+        data.forEach((r, i) => {
+            let linkHtml = "";
+            if(r.vanBanUrl && r.vanBanUrl.includes('http')) { 
+                const links = r.vanBanUrl.split(',').map(l => l.trim()).filter(l => l !== "");
+                linkHtml = `<div style="display:flex; flex-wrap:wrap; gap:3px; justify-content:center;">` + 
+                           links.map((url, idx) => `<a href="${url}" target="_blank" style="text-decoration:none; background:#e0f2fe; border:1px solid #bae6fd; padding:2px 5px; border-radius:3px; font-size:12px; font-weight:bold; color:#0369a1;" title="Xem tài liệu ${idx+1}">📎 ${idx+1}</a>`).join('') +
+                           `</div>`;
+            }
+            
+            const center = 'text-align: center; vertical-align:middle; padding:6px; border: 1px solid #ccc !important;';
+            const left = 'text-align: left !important; vertical-align:middle; padding:6px 10px; border: 1px solid #ccc !important;';
+            const rowDataString = encodeURIComponent(JSON.stringify(r));
+
+            let htmlSua = "";
+            if (IS_AUTH_CV) {
+                htmlSua = `<td style="${center}">
+                    <button onclick="transferToEditCongVan(this, '${rowDataString}')" style="border:1px solid #94a3b8; background:#fff; cursor:pointer; padding:3px 8px; border-radius:4px; color:#1e3a8a; font-weight:bold;" title="Sửa">📝</button>
+                </td>`;
+            }
+
+            tb.innerHTML += `
+            <tr style="background-color:${i%2===0?'white':'#f9fafb'}; border-bottom:1px solid #eee;">
+                ${htmlSua} <td style="${center}">${i + 1}</td>
+                <td style="${center}">${r.ngayBH}</td>
+                <td style="${center} font-weight:bold; color:#1e3a8a;">${r.kyHieu}</td>
+                <td style="${left}">${r.trichYeu}</td>
+                <td style="${center}">${r.noiNhan}</td>
+                <td style="${center}">${linkHtml}</td>
+                <td style="${center} font-size:13px; color:#666;">${r.ghiChu}</td>
+            </tr>`;
+        });
+    }
+
+    function transferToEditCongVan(btn, dataEncoded) {
+         try {
+             const rowData = JSON.parse(decodeURIComponent(dataEncoded));
+             if(typeof fillFormCongVan === 'function') {
+                 fillFormCongVan(rowData);
+                 const tr = btn.closest('tr');
+                 tr.style.backgroundColor = '#fef9c3'; 
+                 tr.style.transition = 'opacity 0.5s'; 
+                 tr.style.opacity = '0';
+                 setTimeout(() => tr.remove(), 500);
+                 toast("✅ Đã chuyển dữ liệu sang tab [NHẬP CÔNG VĂN].");
+             } else {
+                 toast("❌ Lỗi: Không tìm thấy hàm điền dữ liệu.");
+             }
+         } catch(e) { console.error(e); toast("❌ Lỗi đọc dữ liệu!"); }
+    }
+
+    function parseDateCV(str) { 
+        if(!str) return 0; 
+        try { 
+            const p = str.split('/'); 
+            if(p.length < 3) return 0;
+            return new Date(p[2], p[1]-1, p[0]).getTime(); 
+        } catch(e) { return 0; } 
+    }
+    
+    function formatDate(elm) { 
+        let v = elm.value.replace(/\D/g,'');
+        if (v.length > 8) v = v.substring(0,8); 
+        let o = ""; 
+        if (v.length > 0) o += v.substring(0,2);
+        if (v.length > 2) o += '/' + v.substring(2,4); 
+        if (v.length > 4) o += '/' + v.substring(4,8);
+        elm.value = o; 
+    }
+</script>

@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <link rel="icon" href="https://i.ibb.co/hRpcrNWx/logo-kimdong-25mm.png">
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Hệ thống quản lý công văn và lịch công tác nội bộ - Trường TH&THCS Hợp Thành.">
+  <title>Quản lý Công văn & Lịch công tác - KIM ĐỒNG</title>
+
+  <script src="ketnoi.js?v=20260328"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+
+  <style>
+    /* --- 1. MÀN HÌNH CHỜ KẾT NỐI --- */
+    #loading-overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(255, 255, 255, 0.95); display: flex; flex-direction: column;
+      align-items: center; justify-content: center; z-index: 9999; transition: opacity 0.5s ease;
+    }
+    .spinner {
+      width: 50px; height: 50px; border: 5px solid #f3f3f3;
+      border-top: 5px solid #1e3a8a; border-radius: 50%;
+      animation: spin 1s linear infinite; margin-bottom: 15px;
+    }
+    .loading-text { font-family: 'Segoe UI', Arial, sans-serif; font-size: 16px; color: #1e3a8a; font-weight: bold; letter-spacing: 0.5px; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    /* MÀN HÌNH ĐĂNG NHẬP */
+    #login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f0fdf4; z-index: 999999; display: flex; flex-direction: column; justify-content: center; align-items: center; font-family: "Times New Roman", serif; }
+    .login-box { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; border-top: 5px solid #1e3a8a; }
+
+    /* --- 2. CẤU HÌNH GIAO DIỆN CHÍNH --- */
+    :root { --primary: #1e3a8a; --red: #b91c1c; --bg: #f3f4f6; }
+    body { font-family: "Times New Roman", serif; background: var(--bg); margin: 0; padding: 0; }
+    
+    .header { background: white; border-bottom: 3px solid var(--red); display: flex; align-items: center; justify-content: center; padding: 5px; gap: 15px; position: sticky; top: 0; z-index: 1000; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+    .header img { width: 60px; height: 60px; object-fit: contain; }
+    .header-text { text-align: center; }
+    .school-name { font-size: 14px; font-weight: bold; color: var(--primary); text-transform: uppercase; }
+    .app-title { font-size: 24px; font-weight: 900; color: var(--red); margin-top: 5px; }
+    
+    /* Mở rộng khung tối đa 1550px */
+    .main-wrapper { 
+      width: 1550px; 
+      max-width: 99%; 
+      margin: 10px auto; 
+      background: white; 
+      padding: 15px; 
+      border-radius: 8px; 
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+      display:none;
+    }
+    
+    .tabs { display: flex; border-bottom: 2px solid #eee; margin-bottom: 10px; }
+    .tab-btn { padding: 10px 20px; border: none; background: none; cursor: pointer; font-weight: bold; color: #666; border-bottom: 3px solid transparent; }
+    .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); background: #f0f9ff; }
+    .tab-content { display: none; min-height: 150px; }
+    .tab-content.active { display: block; }
+    
+    .table-scroll { width: 100%; overflow-x: auto; margin-top: 5px; }
+    table { width: 100% !important; min-width: 100% !important; border-collapse: collapse; margin-bottom: 5px; table-layout: fixed !important; }
+    th { background: #1e3a8a; color: white; padding: 10px; border: 1px solid #ccc; font-size: 14px; text-align: center; vertical-align: middle; }
+    td { border: 1px solid #ccc; padding: 0; vertical-align: middle !important; text-align: center; word-wrap: break-word; }
+
+    .loading-data-box { padding: 40px 0; text-align: center; border: 1px solid #eee; border-top: none; }
+    .cell-input { width: 100%; border: none; padding: 8px; font-family: "Times New Roman"; font-size: 15px; outline: none; resize: none; overflow: hidden; min-height: 40px; box-sizing: border-box; display: block; text-align: center; }
+    textarea.cell-input { text-align: left; white-space: pre-wrap; }
+    .cell-input:focus { background: #fffbe7; }
+    
+    .btn-save { background: var(--primary); color: white; border: none; padding: 10px 30px; font-weight: bold; border-radius: 4px; cursor: pointer; float: right; }
+    .btn-upload-small { background: #8b5cf6; color: white; border: none; padding: 4px 10px; border-radius: 12px; cursor: pointer; font-size: 12px; margin-top: 5px; }
+    
+    .cv-header-title { text-align: center; color: #b91c1c; font-weight: bold; font-size: 18px; margin-bottom: 5px; border-bottom: 2px solid #eee; padding-bottom: 5px; }
+    .cv-controls { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; margin-bottom: 10px; padding: 2px; background: #fffbe7; border: 1px solid #eab308; border-radius: 6px; }
+    .cv-row { display: flex; gap: 10px; align-items: center; width: 100%; }
+    .cv-label { font-weight: bold; width: 140px; text-align: right; }
+    .cv-combo { flex: 1; padding: 6px; border: 1px solid #ccc; border-radius: 4px; font-family: "Times New Roman"; font-size: 15px; max-width: 400px; }
+
+    /* Lớp CSS dùng chung cho các màn hình chặn an toàn */
+    .access-denied-container { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 80vh; text-align: center; font-family: 'Times New Roman', serif; }
+    .access-icon { font-size: 80px; margin-bottom: 20px; }
+    .access-title { font-size: 32px; font-weight: bold; margin-bottom: 10px; text-transform: uppercase; }
+    .access-msg { font-size: 18px; color: #555; max-width: 600px; line-height: 1.6; }
+    .contact-box { margin-top: 30px; padding: 15px 30px; background: #f3f4f6; border-radius: 8px; border: 1px dashed #999; }
+    
+    .dev-badge { position: absolute; right: 15px; top: 50%; transform: translateY(-50%); display: flex; align-items: center; background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%); padding: 5px 15px; border-radius: 50px; border: 1px solid rgba(255, 215, 0, 0.4); box-shadow: 0 4px 15px rgba(0,0,0,0.2); z-index: 1002; cursor: default; overflow: hidden; }
+    .dev-badge::after { content: ''; position: absolute; top: -50%; left: -60%; width: 20%; height: 200%; background: rgba(255, 255, 255, 0.1); transform: rotate(30deg); animation: shine 4s infinite; }
+    @keyframes shine { 0% { left: -60%; } 20% { left: 120%; } 100% { left: 120%; } }
+    .dev-icon-box { font-size: 20px; margin-right: 10px; display: flex; align-items: center; justify-content: center; animation: rocketMove 3s ease-in-out infinite; }
+    @keyframes rocketMove { 0%, 100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(-3px) rotate(5deg); } }
+    .dev-text-box { display: flex; flex-direction: column; line-height: 1.1; }
+    .dev-label-top { font-family: 'Segoe UI', sans-serif; font-size: 8px; color: #cbd5e1; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px; }
+    .dev-name-main { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-weight: 850; color: #ffd700; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; text-shadow: 0 0 8px rgba(255, 215, 0, 0.3); }
+  </style>
+</head>
+<body>
+
+<div id="login-overlay">
+  <div class="login-box">
+    <img src="https://i.ibb.co/hRpcrNWx/logo-kimdong-25mm.png" width="80" style="margin-bottom: 15px;" alt="Logo">
+    <h2 style="color: #b91c1c; margin-top: 0; text-transform: uppercase;">Quản Lý Văn Bản & Lịch công tác</h2>
+    <h3 style="color: #1e3a8a; margin-bottom: 25px;">Trường Tiểu học Kim Đồng</h3>
+    
+    <div style="margin-bottom: 25px; padding: 15px 20px; background-color: #d1e7dd; border-radius: 8px; border: 1px solid #badbcc; text-align: left; color: #0f5132; line-height: 1.6; font-size: 15px;">
+        <div style="display: flex; align-items: flex-start; gap: 8px;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16" style="flex-shrink: 0; margin-top: 2px;">
+                <path d="M5.338 1.59a61 61 0 0 0-2.837.856.48.48 0 0 0-.328.39c-.554 4.157.826 7.11 2.536 8.951a10.7 10.7 0 0 0 3.328 2.15c.14.072.296.072.432 0 1.21-.62 2.25-1.47 3.328-2.15 1.71-1.84 3.09-4.794 2.536-8.95a.48.48 0 0 0-.328-.39c-.96-.289-1.92-.58-2.837-.856C9.53 1.15 8.35 1 8 1s-1.53.15-2.662.59zM8 2.016a1 1 0 0 0-.256.033 62 62 0 0 0-2.766.837c-.496.16-.992.32-1.488.484a.24.24 0 0 0-.164.195c-.443 3.332.222 5.86 1.637 7.394a10.4 10.4 0 0 0 2.916 1.956c.1.05.215.05.314 0a10.4 10.4 0 0 0 2.916-1.956c1.415-1.534 2.08-4.062 1.637-7.394a.24.24 0 0 0-.164-.195c-.496-.164-.992-.324-1.488-.484a62 62 0 0 0-2.766-.837A1 1 0 0 0 8 2.016"/>
+                <path d="M10.854 5.146a.5.5 0 0 1 0 .708l-3 3a.5.5 0 0 1-.708 0l-1.5-1.5a.5.5 0 1 1 .708-.708L7.5 7.793l2.646-2.647a.5.5 0 0 1 .708 0"/>
+            </svg>
+            <span><b>Cam kết bảo mật:</b> Hệ thống sử dụng kết nối an toàn tiêu chuẩn của Google.</span>
+        </div>
+    </div>
+
+    <div style="font-size: 16px; color:#b91c1c; font-weight: bold; margin-bottom: 15px;">Phiên bản: V2.4.2026</div>
+    
+    <div id="g_id_onload"  data-client_id="407480994586-m6fpq6sfcc90qqj9k08rsmi1lge6br94.apps.googleusercontent.com" data-callback="handleCredentialResponse" data-auto_prompt="false"></div>
+    
+    <div style="display: flex; justify-content: center; width: 100%;">
+        <div class="g_id_signin" data-type="standard" data-size="large" data-theme="outline" data-text="sign_in_with" data-shape="rectangular" data-logo_alignment="left"></div>
+    </div>
+    
+    <div style="margin-top: 30px; font-size: 15px; color: #888; font-weight: bold; text-align: center; width: 100%;">Phát triển bởi: HOÀNG NGỌC LÂM</div>
+  </div>
+</div>
+
+<div id="loading-overlay">
+  <div class="spinner"></div>
+  <div class="loading-text">Đang kết nối hệ thống dữ liệu...</div>
+</div>
+
+<div class="header" style="position: sticky; top: 0; z-index: 1000; background: white;"> 
+  <img src="https://i.ibb.co/hRpcrNWx/logo-kimdong-25mm.png" alt="Logo">
+  <div class="header-text">
+    <div class="school-name">TRƯỜNG TIỂU HỌC KIM ĐỒNG</div>
+    <div class="app-title">QUẢN LÝ VĂN BẢN & LỊCH CÔNG TÁC</div>
+  </div>
+  <div class="dev-badge">
+      <div class="dev-icon-box">💎</div>
+      <div class="dev-text-box">
+          <span class="dev-label-top">System Architect</span>
+          <span class="dev-name-main">HOÀNG NGỌC LÂM</span>
+      </div>
+  </div>
+</div>
+
+<div id="trial-active-banner" style="display:none; background: #fffbeb; color: #b45309; text-align: center; padding: 10px; font-size: 15px; font-weight: bold; border-bottom: 1px solid #fcd34d;">
+  ℹ️ Hệ thống đang trong thời gian dùng thử. Bạn còn <span id="trial-days-left"></span> ngày trải nghiệm.
+</div>
+
+<div class="main-wrapper" id="mainApp" style="display:none;">
+  <div class="tabs">
+    <button id="btnTabNhap" class="tab-btn" onclick="showTab('tabInput', this)">📝 NHẬP LỊCH</button>
+    <button id="btnTabSearch" class="tab-btn active" onclick="showTab('tabSearch', this)">🔍 TRA CỨU LỊCH</button>
+    <button id="btnTabCV" class="tab-btn" onclick="showTab('tabCongVan', this)">📂 NHẬP CÔNG VĂN</button>
+    <button id="btnTabSearchCV" class="tab-btn" onclick="showTab('tabSearchCongVan', this)">🔎 TÌM KIẾM VĂN BẢN</button>
+    <button class="tab-btn" onclick="logoutGoogle()" style="margin-left:auto; color:#dc2626;">🚪 ĐĂNG XUẤT</button>
+  </div>
+  <div id="tabInput" class="tab-content"></div>
+  <div id="tabSearch" class="tab-content active"></div>
+  <div id="tabCongVan" class="tab-content"></div>
+  <div id="tabSearchCongVan" class="tab-content"></div>
+</div>
+
+<div id="modalMinhChung"></div>
+
+<div id="accessDeniedBanner" class="access-denied-container" style="display:none;">
+    <div class="access-icon">⛔</div>
+    <div class="access-title" style="color: #b91c1c;">Không có quyền truy cập</div>
+    <div class="access-msg">
+        Xin chào <b><span id="blockedOpCode"></span></b>.<br>
+        Tài khoản của bạn hiện không có quyền truy cập vào hệ thống hồ sơ.
+    </div>
+    <div class="contact-box">
+        <b>Vui lòng liên hệ Quản trị viên để được cấp quyền.</b><br>
+        <button onclick="logoutGoogle()" style="margin-top:10px; background:#b91c1c; color:white; border:none; padding:8px 20px; border-radius:4px; cursor:pointer;">Đăng xuất</button>
+    </div>
+</div>
+
+<div id="trial-expired-banner" class="access-denied-container" style="display:none;">
+    <div class="access-icon">⏳</div>
+    <div class="access-title" style="color: #ea580c;">HẾT HẠN DÙNG THỬ</div>
+    <div class="access-msg">
+        Thời gian trải nghiệm hệ thống (14 ngày) đã kết thúc.<br>
+        Xin vui lòng liên hệ Kỹ thuật viên / Quản trị hệ thống để kích hoạt phiên bản chính thức.
+    </div>
+    <div class="contact-box">
+        <b style="color: #15803d;">Mọi dữ liệu của nhà trường vẫn được lưu trữ an toàn trên máy chủ.</b>
+    </div>
+</div>
+
+<div id="global_msg" style="display:none; position:fixed; bottom:20px; right:20px; background:#333; color:white; padding:10px 20px; border-radius:4px; z-index:9999;"></div>
+
+<script>
+  let GLOBAL_OP_CODE = "";
+  let GLOBAL_ALLOW_INPUT = false; 
+
+  function checkTrialPeriod() {
+     return true;
+  }
+
+  window.onload = function() {
+    if (!checkTrialPeriod()) return;
+    const storedId = sessionStorage.getItem("APP_OPERATOR_CODE");
+    if(storedId) {
+      window.SCV_GLOBAL_OP_CODE = storedId; 
+      document.getElementById('login-overlay').style.display = 'none';
+      document.getElementById('loading-overlay').style.display = 'flex';
+      checkPermissionAndLoad();
+    }
+  };
+
+  function handleCredentialResponse(response) {
+    if (!checkTrialPeriod()) return;
+    const payload = decodeJwtResponse(response.credential);
+    const operatorCode = payload.email; // Trực tiếp khai báo tường minh
+    
+    sessionStorage.setItem("APP_OPERATOR_CODE", operatorCode);
+    window.SCV_GLOBAL_OP_CODE = operatorCode; 
+    document.getElementById('login-overlay').style.display = 'none';
+    document.getElementById('loading-overlay').style.display = 'flex';
+    checkPermissionAndLoad();
+  }
+
+  function decodeJwtResponse(token) {
+    let base64Url = token.split('.')[1];
+    let base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    let jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+    }).join(''));
+    return JSON.parse(jsonPayload);
+  }
+
+  function logoutGoogle() {
+    sessionStorage.removeItem("APP_OPERATOR_CODE");
+    window.SCV_GLOBAL_OP_CODE = null;
+    location.reload(); 
+  }
+
+  function checkPermissionAndLoad() {
+    google.script.run.withSuccessHandler(res => {
+      document.getElementById('loading-overlay').style.display = 'none';
+      GLOBAL_OP_CODE = res.operatorCode;
+      GLOBAL_ALLOW_INPUT = res.canInput; 
+      if (!res.canView) {
+          document.getElementById('mainApp').style.display = 'none';
+          document.getElementById('accessDeniedBanner').style.display = 'flex';
+          document.getElementById('blockedOpCode').innerText = GLOBAL_OP_CODE;
+          return; 
+      }
+      document.getElementById('mainApp').style.display = 'block';
+      if (!res.canInput) {
+          document.getElementById('btnTabNhap').style.display = 'none';
+          document.getElementById('btnTabCV').style.display = 'none';
+          showTab('tabSearch', document.getElementById('btnTabSearch'));
+      } else {
+          document.getElementById('btnTabNhap').style.display = 'inline-block';
+          document.getElementById('btnTabCV').style.display = 'inline-block';
+      }
+      loadSystemModules();
+    }).SCV_getInitialData();
+  }
+
+  async function loadSystemModules() {
+      try {
+        const cacheBuster = "?v=" + new Date().getTime(); 
+        const [res1, res2, res3, res4, res5] = await Promise.all([
+            fetch('./SCV_Tab_NhapLich.html' + cacheBuster),
+            fetch('./SCV_Tab_TraCuuLich.html' + cacheBuster),
+            fetch('./SCV_Tab_NhapCongVan.html' + cacheBuster),
+            fetch('./SCV_Tab_TraCuuCongVan.html' + cacheBuster),
+            fetch('./SCV_MinhChung_CongVan.html' + cacheBuster)
+        ]);
+        document.getElementById('tabInput').innerHTML = await res1.text();
+        document.getElementById('tabSearch').innerHTML = await res2.text();
+        document.getElementById('tabCongVan').innerHTML = await res3.text();
+        document.getElementById('tabSearchCongVan').innerHTML = await res4.text();
+        document.getElementById('modalMinhChung').innerHTML = await res5.text();
+        executeScripts(document.getElementById('mainApp'));
+        executeScripts(document.getElementById('modalMinhChung'));
+        setTimeout(() => {
+            try { if(typeof loadFolders === 'function') loadFolders(); } catch(e) {}
+            try { if(typeof loadDataServer === 'function') loadDataServer(); } catch(e) {}
+            try { if(typeof initCongVan === 'function') initCongVan(); } catch(e) {}
+            try { if(typeof initSearchCV === 'function') initSearchCV(); } catch(e) {}
+        }, 800);
+      } catch (e) {
+        alert("LỖI KẾT NỐI TỆP: " + e.message);
+      }
+  }
+
+  function executeScripts(element) {
+      const scripts = element.querySelectorAll('script');
+      scripts.forEach(oldScript => {
+          const newScript = document.createElement('script');
+          Array.from(oldScript.attributes).forEach(attr => newScript.setAttribute(attr.name, attr.value));
+          newScript.appendChild(document.createTextNode(oldScript.innerHTML));
+          oldScript.parentNode.replaceChild(newScript, oldScript);
+      });
+  }
+
+  function showTab(id, btn) {
+    document.querySelectorAll('.tab-content').forEach(e => e.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(e => e.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    btn.classList.add('active');
+    if(id === 'tabSearch') if(typeof loadDataServer === 'function') loadDataServer();
+    if(id === 'tabSearchCongVan') if(typeof loadDataSearchCV === 'function') loadDataSearchCV();
+  }
+  
+  function toast(msg) {
+    const d = document.getElementById('global_msg');
+    d.innerText = msg; d.style.display = 'block';
+    setTimeout(() => d.style.display = 'none', 3000);
+  }
+</script>
+</body>
+</html>
